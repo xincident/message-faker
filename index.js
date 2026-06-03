@@ -1,25 +1,26 @@
-//  COMPATIBLE VERSION - Replace your entire index.js with this
+// KETTU / VENDETTA GLOBAL COMPATIBLE VERSION
+// Replace ALL @vendetta imports with vendetta.* globals
 
-//  imports (different from Vendetta)
-const { storage } = require("@kettu/plugin");
-const { React, ReactNative, constants } = require("@kettu/metro/common");
-const { semanticColors } = require("@kettu/ui");
-const { getAssetIDByName } = require("@kettu/ui/assets");
-const { Forms } = require("@kettu/ui/components");
-const { showToast } = require("@kettu/ui/toasts");
-const { findByProps, findByStoreName } = require("@kettu/metro");
-const { after, before } = require("@kettu/patcher");
-const { clipboard } = require("@kettu/metro/common");
+// Get required modules from the global vendetta object
+const { storage } = vendetta.plugin;
+const { React, ReactNative, constants } = vendetta.metro.common;
+const { semanticColors } = vendetta.ui;
+const { getAssetIDByName } = vendetta.ui.assets;
+const { Forms } = vendetta.ui.components;
+const { showToast } = vendetta.ui.toasts;
+const { findByProps, findByStoreName } = vendetta.metro;
+const { after, before } = vendetta.patcher;
+const { clipboard } = vendetta.metro.common;
 
 const { FormRow, FormSection, FormInput, FormDivider, FormSwitchRow, FormText } = Forms;
 const { ScrollView, View, Text, TouchableOpacity } = ReactNative;
 
-// Kettu's store access
+// Kettu's store access (same as Vendetta)
 const MessageStore = findByStoreName("MessageStore");
 const ChannelStore = findByStoreName("ChannelStore");
 const UserStore = findByStoreName("UserStore");
 
-// Initialize storage
+// Initialize storage (using vendetta.storage)
 storage.targetUserId ??= "";
 storage.fromUserId ??= "";
 storage.messageContent ??= "";
@@ -60,7 +61,7 @@ function createFakeMessage(channelId, authorId, content, embed = null) {
     flags: 0,
     referenced_message: null,
     _fake: true,
-    _kettu: true,  // Kettu-specific flag
+    _kettu: true,
   };
 }
 
@@ -68,22 +69,30 @@ function injectFakeMessage(channelId, authorId, content, embed = null) {
   try {
     const fakeMessage = createFakeMessage(channelId, authorId, content, embed);
     
-    // Kettu's message store injection method
-    if (MessageStore && MessageStore._handleMessageCreate) {
-      MessageStore._handleMessageCreate(fakeMessage);
-    } else if (MessageStore.dispatch) {
+    // Method 1: Try to dispatch to MessageStore (Vendetta/Kettu style)
+    if (MessageStore && MessageStore.dispatch) {
       MessageStore.dispatch({
         type: "MESSAGE_CREATE",
         channelId: channelId,
         message: fakeMessage,
       });
-    } else {
-      // Fallback for Kettu
-      const messages = MessageStore.getMessages(channelId);
-      if (messages) {
-        messages.unshift(fakeMessage);
-        MessageStore.emit("messages-updated", channelId);
+      return true;
+    }
+    
+    // Method 2: Fallback - patch MessageStore.getMessages
+    const unpatch = after("getMessages", MessageStore, (args, res) => {
+      if (res && Array.isArray(res)) {
+        res.unshift(fakeMessage);
+        return res;
       }
+      return res;
+    });
+    patches.push(unpatch);
+    
+    // Force a refresh of the channel
+    const channel = ChannelStore.getChannel(channelId);
+    if (channel && MessageStore.emit) {
+      MessageStore.emit("messages-updated", channelId);
     }
     
     return true;
@@ -106,7 +115,7 @@ async function getDMChannel(userId) {
   }
 }
 
-// Settings Component - Kettu compatible
+// Settings Component
 function Settings() {
   const [targetUserId, setTargetUserId] = React.useState(storage.targetUserId || "");
   const [fromUserId, setFromUserId] = React.useState(storage.fromUserId || "");
@@ -288,22 +297,26 @@ function Settings() {
   );
 }
 
-// Plugin export for Kettu
+// Plugin export for Kettu/Vendetta
 export default {
   name: "MessageFaker",
-  description: "Inject fake messages into any DM from any user",
+  description: "Inject fake messages into DMs from anyone",
   authors: [{ name: "xxjust12", id: "0" }],
   onLoad: () => {
     // Expose API to console for advanced users
-    globalThis.messageFaker = {
-      inject: injectFakeMessage,
-      getDMChannel: getDMChannel,
-    };
+    if (typeof window !== "undefined") {
+      window.messageFaker = {
+        inject: injectFakeMessage,
+        getDMChannel: getDMChannel,
+      };
+    }
     console.log("[MessageFaker] Loaded on Kettu!");
   },
   onUnload: () => {
     patches.forEach(unpatch => unpatch());
-    delete globalThis.messageFaker;
+    if (typeof window !== "undefined") {
+      delete window.messageFaker;
+    }
   },
   settings: Settings,
 };
