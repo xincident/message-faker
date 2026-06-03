@@ -1,0 +1,12 @@
+{
+  "name": "MessageFaker",
+  "description": "Inject fake messages into DMs from anyone",
+  "authors": [
+    {
+      "name": "xxjust12",
+      "id": "0"
+    }
+  ],
+  "main": "index.js"
+}
+
