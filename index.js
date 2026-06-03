@@ -1,6 +1,6 @@
-// KETTU COMPATIBLE VERSION - Replace your entire index.js with this
+//  COMPATIBLE VERSION - Replace your entire index.js with this
 
-// Kettu imports (different from Vendetta)
+//  imports (different from Vendetta)
 const { storage } = require("@kettu/plugin");
 const { React, ReactNative, constants } = require("@kettu/metro/common");
 const { semanticColors } = require("@kettu/ui");
